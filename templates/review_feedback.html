@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Unreviewed Feedback</title>
+</head>
+<body>
+    <h1>Unreviewed Feedback</h1>
+    {% for fb in feedbacks %}
+    <div style="border:1px solid #ccc; margin-bottom:20px; padding:10px;">
+        <p><strong>Feedback ID:</strong> {{ fb.id }}</p>
+        <p><strong>Submission ID:</strong> {{ fb.submission_id }}</p>
+        <p><strong>Feedback (LLM):</strong> {{ fb.feedback_text }}</p>
+        <p><strong>Generated At:</strong> {{ fb.generated_at }}</p>
+        <p><strong>Student Code:</strong></p>
+        <pre>{{ fb.code }}</pre>
+        <form action="{{ url_for('review_feedback', feedback_id=fb.id) }}" method="POST">
+            <label for="teacher_comments">Teacher Comments / Correction:</label><br>
+            <textarea name="teacher_comments" rows="5" cols="80"></textarea><br><br>
+            <button type="submit">Submit Correction</button>
+        </form>
+    </div>
+    {% endfor %}
+</body>
+</html>
