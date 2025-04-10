@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Set environment variables for the GitHub Actions runner.
 # (Sensitive values should be supplied at runtime.)
 ENV RUNNER_VERSION=2.322.0
-ENV RUNNER_ARCH=arm64
+ENV RUNNER_ARCH=x64
 ENV GH_RUNNER_TOKEN=""
 ENV GH_RUNNER_REPO_URL=""
 ENV GH_RUNNER_NAME="teacher-llm-runner"
