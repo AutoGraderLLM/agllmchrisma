@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Set environment variables for the GitHub Actions runner.
 # (Sensitive values should be supplied at runtime.)
-ENV RUNNER_VERSION=2.322.0
+ENV RUNNER_VERSION=2.323.0
 ENV RUNNER_ARCH=x64
 ENV GH_RUNNER_TOKEN=""
 ENV GH_RUNNER_REPO_URL=""
@@ -17,7 +17,7 @@ ENV GH_RUNNER_LABELS="self-hosted,docker"
 # - Runner tools: curl, git, jq
 # - Build tools: build-essential, libssl-dev, libffi-dev, python3-dev
 # - Python and pip
-# - Tools for building llama-cpp-python: cmake, ninja-build
+# - Tools for building llama-cpp-python: cmake, ninja-build, sqlite3
 RUN apt-get update && apt-get install -y \
     curl \
     git \
@@ -62,7 +62,7 @@ RUN useradd -ms /bin/bash runner && \
 # Switch to the non-root user.
 USER runner
 
-# Expose port 5002 for your teacher UI.
+# Expose port 5003 for your teacher UI.
 EXPOSE 5003
 
 # Use the run.sh script as the container's entrypoint.
