@@ -1,25 +1,51 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Unreviewed Feedback</title>
-</head>
-<body>
-    <h1>Unreviewed Feedback</h1>
+{% extends 'base.html' %}
+
+{% block title %}Unreviewed Feedback{% endblock %}
+
+{% block content %}
+  <h1 class="mb-4">Unreviewed Feedback</h1>
+
+  {% if feedbacks %}
     {% for fb in feedbacks %}
-    <div style="border:1px solid #ccc; margin-bottom:20px; padding:10px;">
-        <p><strong>Feedback ID:</strong> {{ fb.id }}</p>
-        <p><strong>Submission ID:</strong> {{ fb.submission_id }}</p>
-        <p><strong>Feedback (LLM):</strong> {{ fb.feedback_text }}</p>
-        <p><strong>Generated At:</strong> {{ fb.generated_at }}</p>
-        <p><strong>Student Code:</strong></p>
-        <pre>{{ fb.code }}</pre>
-        <form action="{{ url_for('review_feedback', feedback_id=fb.id) }}" method="POST">
-            <label for="teacher_comments">Teacher Comments / Correction:</label><br>
-            <textarea name="teacher_comments" rows="5" cols="80"></textarea><br><br>
-            <button type="submit">Submit Correction</button>
-        </form>
-    </div>
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-white">
+          <strong>Feedback #{{ fb['id'] }}</strong>
+          <span class="text-muted">Submission {{ fb['submission_id'] }}</span>
+        </div>
+        <div class="card-body">
+          <p><strong>LLM Says:</strong> {{ fb['feedback_text'] }}</p>
+          <p class="text-muted small">Generated at {{ fb['generated_at'] }}</p>
+
+          <h6 class="mt-3">Student Code</h6>
+          <pre class="p-3 bg-white border rounded">{{ fb['code'] }}</pre>
+
+          <form
+            method="post"
+            action="{{ url_for('review_feedback', feedback_id=fb['id']) }}"
+            class="mt-3"
+          >
+            <div class="mb-3">
+              <label
+                for="teacher_comments_{{ fb['id'] }}"
+                class="form-label"
+              >Teacher Comments / Correction:</label>
+              <textarea
+                class="form-control"
+                id="teacher_comments_{{ fb['id'] }}"
+                name="teacher_comments"
+                rows="3"
+              ></textarea>
+            </div>
+            <button type="submit" class="btn btn-success">
+              Submit Correction
+            </button>
+          </form>
+        </div>
+      </div>
     {% endfor %}
-</body>
-</html>
+  {% else %}
+    <div class="alert alert-info">
+      No unreviewed feedback items at the moment.
+    </div>
+  {% endif %}
+{% endblock %}
