@@ -12,7 +12,8 @@ ENV GH_RUNNER_REPO_URL=""
 ENV GH_RUNNER_NAME="teacher-llm-runner"
 ENV GH_RUNNER_LABELS="self-hosted,docker"
 
-# Install system dependencies, including 'bc' for your hex tests
+# Install system dependencies, including 'bc' for your hex tests,
+# plus curl so we can fetch Ollama’s installer script
 RUN apt-get update && apt-get install -y \
     bc \
     curl \
@@ -29,6 +30,11 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# ─── Install Ollama CLI ─────────────────────────────────────────────────────────
+# This drops /usr/local/bin/ollama into the image.
+RUN curl -fsSL https://ollama.com/install.sh | sh
+# ────────────────────────────────────────────────────────────────────────────────
+
 # Create directories for the runner and your app code
 RUN mkdir -p /actions-runner /app
 
@@ -41,7 +47,7 @@ RUN curl -fsSL \
     && rm -f actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz \
     && mv run.sh runner.sh
 
-# Install your Python requirements and copy in all app files (including control_code.py)
+# Install your Python requirements and copy in all app files
 WORKDIR /app
 COPY requirements.txt /app/
 RUN python3 -m pip install --upgrade pip \
@@ -57,11 +63,15 @@ RUN chmod +x run.sh
 RUN useradd -ms /bin/bash runner \
  && chown -R runner:runner /actions-runner /app /home/runner
 
-# Drop to unprivileged user
+# Switch to the unprivileged runner user
 USER runner
 
 # Expose your teacher UI port
 EXPOSE 5003
 
-# Kick off your startup script
-ENTRYPOINT ["/actions-runner/run.sh"]
+# ─── Entrypoint: pull the LLM, then launch the runner ─────────────────────────
+# When the container starts, this will:
+#  1) pull qwen2.5-coder:14b into Ollama’s local cache
+#  2) hand off to your existing run.sh
+ENTRYPOINT ["sh","-c","ollama pull qwen2.5-coder && exec /actions-runner/run.sh"]
+# ────────────────────────────────────────────────────────────────────────────────
