@@ -38,6 +38,8 @@ jobs:
       - name: Run Python script
         run: |
           REPO_NAME=$(echo "$GITHUB_REPOSITORY" | awk -F'/' '{print $2}')
+          pwd
+          ls
           python3 $HOME/control_code.py $REPO_NAME
         if: always()  # always run, even on failure
 
