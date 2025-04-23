@@ -1,14 +1,85 @@
+/* ───────────────────────────
+   GLOBAL
+   ─────────────────────────── */
 body {
-  background-color: #f8f9fa;
+  background-color: #f8f9fa;       /* light grey */
+  font-family: system-ui, sans-serif;
 }
+
+/* ───────────────────────────
+   CARDS
+   ─────────────────────────── */
 .card {
-  border: none;
+  border: none;                    /* rely on shadow only */
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,.04);
 }
+
 .card-header {
+  background: #fff;
   border-bottom: 1px solid #dee2e6;
+  font-weight: 600;
 }
-pre {
-  background-color: #f5f5f5;
-  font-size: 0.9rem;
+
+/* ───────────────────────────
+   MARKDOWN-generated content
+   ─────────────────────────── */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  margin-top: 1.25rem;
+  font-weight: 600;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.25rem;
+}
+
+.markdown-body code {
+  background: #f1f3f5;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+}
+
+/* ───────────────────────────
+   CODE BLOCKS
+   ─────────────────────────── */
+pre,
+pre code {
+  background-color: #272b30;       /* dark theme */
+  color: #f1f1f1;
+  font-size: 0.85rem;
   overflow-x: auto;
+  border-radius: 0.35rem;
+  line-height: 1.4;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+/* ───────────────────────────
+   BADGES (student list)
+   ─────────────────────────── */
+.list-group-item {
+  cursor: pointer;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.4em 0.6em;
+}
+
+/* ───────────────────────────
+   FORMS
+   ─────────────────────────── */
+textarea.form-control {
+  min-height: 6rem;
+}
+
+/* ───────────────────────────
+   UTILITY HELPERS
+   ─────────────────────────── */
+.text-primary {
+  color: #0062cc !important;
 }
