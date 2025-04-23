@@ -1,4 +1,13 @@
-# create_database.py  (complete replacement)
+"""
+Create or rebuild agllmdatabase.db
+
+Schema:
+• students, assignments, submissions  (keeps legacy `code` column)
+• NEW  code_files   – one row per file, tied to a submission
+• NEW  feedback     – repo-aware, review-ready (reviewed INT 0/1)
+• autograder_outputs
+"""
+
 import sqlite3, os
 from datetime import datetime
 
@@ -20,79 +29,78 @@ CREATE TABLE students (
 );
 
 CREATE TABLE assignments (
-  id          INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY,
   description TEXT NOT NULL
 );
 
 CREATE TABLE submissions (
-  id             INTEGER PRIMARY KEY,
-  student_repo   TEXT    NOT NULL REFERENCES students(student_repo),
-  assignment_id  INTEGER NOT NULL REFERENCES assignments(id),
-  submitted_at   TEXT    NOT NULL
+  id            INTEGER PRIMARY KEY,
+  student_repo  TEXT    NOT NULL REFERENCES students(student_repo),
+  assignment_id INTEGER NOT NULL REFERENCES assignments(id),
+  code TEXT,                     -- legacy single-blob field (kept)
+  submitted_at TEXT NOT NULL
 );
 
--- NEW: each file attached to a submission
 CREATE TABLE code_files (
   id            INTEGER PRIMARY KEY,
   submission_id INTEGER NOT NULL REFERENCES submissions(id),
-  filename      TEXT    NOT NULL,
-  code          TEXT    NOT NULL
+  filename      TEXT NOT NULL,
+  code          TEXT NOT NULL
 );
 
 CREATE TABLE feedback (
-  id                  INTEGER PRIMARY KEY,
-  submission_id       INTEGER NOT NULL REFERENCES submissions(id),
-  repo_name           TEXT    NOT NULL,                -- redundant but handy
-  feedback_text       TEXT    NOT NULL,
-  generated_at        TEXT    NOT NULL,
-  reviewed            INTEGER NOT NULL DEFAULT 0,      -- 0 = todo, 1 = done
-  teacher_comments    TEXT,
-  reviewed_at         TEXT
+  id            INTEGER PRIMARY KEY,
+  submission_id INTEGER NOT NULL REFERENCES submissions(id),
+  repo_name     TEXT    NOT NULL,
+  feedback_text TEXT    NOT NULL,
+  generated_at  TEXT    NOT NULL,
+  reviewed      INTEGER NOT NULL DEFAULT 0,
+  teacher_comments TEXT,
+  reviewed_at   TEXT
 );
 
 CREATE TABLE autograder_outputs (
   id            INTEGER PRIMARY KEY,
   submission_id INTEGER NOT NULL REFERENCES submissions(id),
-  output        TEXT    NOT NULL,
-  generated_at  TEXT    NOT NULL
+  output        TEXT NOT NULL,
+  generated_at  TEXT NOT NULL
 );
 
-CREATE INDEX idx_feedback_repo   ON feedback(repo_name, reviewed);
-CREATE INDEX idx_codefiles_sub   ON code_files(submission_id);
+CREATE INDEX idx_feedback_repo     ON feedback(repo_name, reviewed);
+CREATE INDEX idx_codefiles_sub     ON code_files(submission_id);
 """
 
 def build_demo():
     conn = sqlite3.connect(DB)
-    cur  = conn.cursor()
-    cur.executescript(DDL)
+    conn.executescript(DDL)
+    cur = conn.cursor()
 
-    # demo student / assignment
-    cur.execute("INSERT INTO students VALUES (?,?)",
-                ('repo1', '{"name":"Sample Student"}'))
+    # demo data -----------------------------------------------------
+    cur.execute("INSERT INTO students VALUES('repo1','{\"name\":\"Sample\"}')")
     cur.execute("INSERT INTO assignments(id,description) VALUES(1,'Demo')")
-    conn.commit()
+    now = datetime.utcnow().isoformat() + "Z"
 
-    # demo submission + two files
-    now = datetime.utcnow().isoformat()+'Z'
-    cur.execute("INSERT INTO submissions(student_repo,assignment_id,submitted_at) "
-                "VALUES('repo1',1,?)", (now,))
+    # submission + two files
+    cur.execute("""INSERT INTO submissions
+        (student_repo,assignment_id,submitted_at,code)
+        VALUES('repo1',1,?, 'print(123)')""", (now,))
     sub_id = cur.lastrowid
     cur.executemany(
-        "INSERT INTO code_files(submission_id,filename,code) VALUES(?,?,?)",
+        "INSERT INTO code_files(submission_id,filename,code) VALUES (?,?,?)",
         [
           (sub_id,'main.py','print("Hello")'),
-          (sub_id,'utils.py','def add(a,b): return a+b'),
+          (sub_id,'utils.py','def add(a,b): return a+b')
         ]
     )
 
-    # demo unreviewed feedback
     cur.execute("""INSERT INTO feedback
         (submission_id,repo_name,feedback_text,generated_at)
         VALUES(?,?,?,?)""",
-        (sub_id,'repo1','Great start, but think about edge cases.',now))
+        (sub_id,'repo1','Great start – think about edge cases.',now))
+
     conn.commit()
     conn.close()
-    print("DB rebuilt with sample data ✔")
+    print("DB ready →", DB)
 
 if __name__ == "__main__":
     build_demo()
