@@ -1,124 +1,98 @@
-import sqlite3
-import os
+# create_database.py  (complete replacement)
+import sqlite3, os
 from datetime import datetime
 
-def create_database():
-    """Create SQLite database with the updated schema and pre‑populate with sample data."""
-    # Path for the SQLite file
-    db_path = os.path.join(os.getenv("HOME"), "agllmdatabase.db")
-    
-    # Connect (creates file if it doesn't exist)
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+DB = os.path.join(os.getenv("HOME"), "agllmdatabase.db")
 
-    # === SCHEMA DEFINITION ===
-    schema = """
-    PRAGMA foreign_keys = ON;
+DDL = """
+PRAGMA foreign_keys = ON;
 
-    -- Drop any existing tables
-    DROP TABLE IF EXISTS students;
-    DROP TABLE IF EXISTS assignments;
-    DROP TABLE IF EXISTS submissions;
-    DROP TABLE IF EXISTS feedback;
-    DROP TABLE IF EXISTS autograder_outputs;
+DROP TABLE IF EXISTS students;
+DROP TABLE IF EXISTS assignments;
+DROP TABLE IF EXISTS submissions;
+DROP TABLE IF EXISTS code_files;
+DROP TABLE IF EXISTS feedback;
+DROP TABLE IF EXISTS autograder_outputs;
 
-    -- Students table
-    CREATE TABLE students (
-        student_repo TEXT PRIMARY KEY,
-        additional_data TEXT
-    );
+CREATE TABLE students (
+  student_repo TEXT PRIMARY KEY,
+  additional_data TEXT
+);
 
-    -- Assignments table
-    CREATE TABLE assignments (
-        id          INTEGER PRIMARY KEY,
-        description TEXT    NOT NULL
-    );
+CREATE TABLE assignments (
+  id          INTEGER PRIMARY KEY,
+  description TEXT NOT NULL
+);
 
-    -- Submissions table
-    CREATE TABLE submissions (
-        id             INTEGER PRIMARY KEY,
-        student_repo   TEXT    NOT NULL REFERENCES students(student_repo),
-        assignment_id  INTEGER NOT NULL REFERENCES assignments(id),
-        code           TEXT    NOT NULL,
-        submitted_at   TEXT    NOT NULL
-    );
+CREATE TABLE submissions (
+  id             INTEGER PRIMARY KEY,
+  student_repo   TEXT    NOT NULL REFERENCES students(student_repo),
+  assignment_id  INTEGER NOT NULL REFERENCES assignments(id),
+  submitted_at   TEXT    NOT NULL
+);
 
-    -- Feedback table (now with status & teacher_edited_response)
-    CREATE TABLE feedback (
-        id                       INTEGER PRIMARY KEY,
-        submission_id            INTEGER NOT NULL REFERENCES submissions(id),
-        feedback_text            TEXT    NOT NULL,
-        generated_at             TEXT    NOT NULL,
-        status                   TEXT    NOT NULL DEFAULT 'UNREVIEWED',
-        teacher_edited_response  TEXT
-    );
+-- NEW: each file attached to a submission
+CREATE TABLE code_files (
+  id            INTEGER PRIMARY KEY,
+  submission_id INTEGER NOT NULL REFERENCES submissions(id),
+  filename      TEXT    NOT NULL,
+  code          TEXT    NOT NULL
+);
 
-    -- Autograder outputs
-    CREATE TABLE autograder_outputs (
-        id            INTEGER PRIMARY KEY,
-        submission_id INTEGER NOT NULL REFERENCES submissions(id),
-        output        TEXT    NOT NULL,
-        generated_at  TEXT    NOT NULL
-    );
+CREATE TABLE feedback (
+  id                  INTEGER PRIMARY KEY,
+  submission_id       INTEGER NOT NULL REFERENCES submissions(id),
+  repo_name           TEXT    NOT NULL,                -- redundant but handy
+  feedback_text       TEXT    NOT NULL,
+  generated_at        TEXT    NOT NULL,
+  reviewed            INTEGER NOT NULL DEFAULT 0,      -- 0 = todo, 1 = done
+  teacher_comments    TEXT,
+  reviewed_at         TEXT
+);
 
-    -- Indexes for faster lookups
-    CREATE INDEX idx_submissions_student_assignment
-        ON submissions(student_repo, assignment_id);
-    CREATE INDEX idx_feedback_submission_id
-        ON feedback(submission_id);
-    CREATE INDEX idx_autograder_outputs_submission_id
-        ON autograder_outputs(submission_id);
-    """
+CREATE TABLE autograder_outputs (
+  id            INTEGER PRIMARY KEY,
+  submission_id INTEGER NOT NULL REFERENCES submissions(id),
+  output        TEXT    NOT NULL,
+  generated_at  TEXT    NOT NULL
+);
 
-    try:
-        # Create all tables & indexes
-        cursor.executescript(schema)
-        print(f"Database created successfully at: {db_path}")
+CREATE INDEX idx_feedback_repo   ON feedback(repo_name, reviewed);
+CREATE INDEX idx_codefiles_sub   ON code_files(submission_id);
+"""
 
-        # === PRE‑POPULATE WITH SAMPLE DATA ===
+def build_demo():
+    conn = sqlite3.connect(DB)
+    cur  = conn.cursor()
+    cur.executescript(DDL)
 
-        # 1) A sample student repo
-        cursor.execute(
-            "INSERT INTO students(student_repo, additional_data) VALUES (?, ?)",
-            ('repo1', '{"name": "Sample Student"}')
-        )
+    # demo student / assignment
+    cur.execute("INSERT INTO students VALUES (?,?)",
+                ('repo1', '{"name":"Sample Student"}'))
+    cur.execute("INSERT INTO assignments(id,description) VALUES(1,'Demo')")
+    conn.commit()
 
-        # 2) A sample assignment
-        cursor.execute(
-            "INSERT INTO assignments(id, description) VALUES (?, ?)",
-            (1, "Sample Assignment")
-        )
+    # demo submission + two files
+    now = datetime.utcnow().isoformat()+'Z'
+    cur.execute("INSERT INTO submissions(student_repo,assignment_id,submitted_at) "
+                "VALUES('repo1',1,?)", (now,))
+    sub_id = cur.lastrowid
+    cur.executemany(
+        "INSERT INTO code_files(submission_id,filename,code) VALUES(?,?,?)",
+        [
+          (sub_id,'main.py','print("Hello")'),
+          (sub_id,'utils.py','def add(a,b): return a+b'),
+        ]
+    )
 
-        # 3) A sample submission
-        submitted_at = datetime.utcnow().isoformat() + "Z"
-        cursor.execute(
-            "INSERT INTO submissions(student_repo, assignment_id, code, submitted_at) VALUES (?, ?, ?, ?)",
-            ('repo1', 1, 'print("Hello, world!")', submitted_at)
-        )
-
-        # 4) A sample unreviewed feedback row
-        generated_at = datetime.utcnow().isoformat() + "Z"
-        cursor.execute(
-            "INSERT INTO feedback(submission_id, feedback_text, generated_at) VALUES (?, ?, ?)",
-            (1, "Good attempt, but consider adding error handling.", generated_at)
-        )
-
-        # 5) A sample autograder output
-        generated_at2 = datetime.utcnow().isoformat() + "Z"
-        cursor.execute(
-            "INSERT INTO autograder_outputs(submission_id, output, generated_at) VALUES (?, ?, ?)",
-            (1, "All tests passed", generated_at2)
-        )
-
-        # Commit everything
-        conn.commit()
-        print("Sample data inserted successfully.")
-
-    except sqlite3.Error as e:
-        print(f"SQLite error: {e}")
-
-    finally:
-        conn.close()
+    # demo unreviewed feedback
+    cur.execute("""INSERT INTO feedback
+        (submission_id,repo_name,feedback_text,generated_at)
+        VALUES(?,?,?,?)""",
+        (sub_id,'repo1','Great start, but think about edge cases.',now))
+    conn.commit()
+    conn.close()
+    print("DB rebuilt with sample data ✔")
 
 if __name__ == "__main__":
-    create_database()
+    build_demo()
