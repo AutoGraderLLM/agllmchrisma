@@ -67,9 +67,13 @@ def main() -> None:
     # 1️⃣ gather code files
     if not STUDENT_CODE_DIR.is_dir():
         err(f"{STUDENT_CODE_DIR} not found")
-    code_files = sorted(p for p in STUDENT_CODE_DIR.rglob("*.py"))
+    # NEW (language-agnostic)
+    code_files = sorted(
+        p for p in STUDENT_CODE_DIR.rglob("*")
+        if p.is_file() and not p.name.startswith(".")     # skip dot-files
+    )
     if not code_files:
-        err("No *.py files found in studentcode/")
+        err(f"No files found in {STUDENT_CODE_DIR}")
 
     student_code_blob = ""
     for p in code_files:
