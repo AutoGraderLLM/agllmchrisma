@@ -1,39 +1,32 @@
 {% extends 'base.html' %}
 {% block title %}Review – {{ repo }}{% endblock %}
-
 {% block content %}
-<a href="{{ url_for('choose_student') }}" class="btn btn-link mb-3">← Back to students</a>
+<a href="{{ url_for('choose_student') }}" class="btn btn-link mb-3">← Back</a>
 <h2 class="mb-4">{{ repo }}</h2>
 
-{% if feedbacks %}
-  {% for fb in feedbacks %}
-    <div class="card mb-4 shadow-sm">
-      <div class="card-header">
-        <strong>#{{ fb.id }}</strong>
-        <span class="text-muted small ms-2">{{ fb.generated_at }}</span>
-      </div>
-      <div class="card-body">
-        <h6>LLM Feedback</h6>
-        <div class="markdown-body">{{ fb.feedback_html|safe }}</div>
+{% for fb in feedbacks %}
+<div class="card mb-4 shadow-sm">
+  <div class="card-header">
+    <strong>#{{ fb.id }}</strong>
+    <span class="text-muted small ms-2">{{ fb.generated_at }}</span>
+  </div>
+  <div class="card-body">
 
-        <h6 class="mt-4">Student Code</h6>
-        {% for c in fb.code_files %}
-          <p class="fw-bold small mb-1">{{ c.filename }}</p>
-          <pre class="p-3 bg-white border rounded"><code>{{ c.code }}</code></pre>
-        {% endfor %}
+    <h6>LLM Feedback</h6>
+    <div class="markdown-body">{{ fb.feedback_html|safe }}</div>
 
-        <form method="post" action="{{ url_for('mark_reviewed', fid=fb.id) }}">
-          <input type="hidden" name="repo" value="{{ repo }}">
-          <div class="mb-3">
-            <label for="t{{ fb.id }}" class="form-label">Teacher comments</label>
-            <textarea class="form-control" id="t{{ fb.id }}" name="teacher_comments" rows="3"></textarea>
-          </div>
-          <button type="submit" class="btn btn-success">Mark reviewed</button>
-        </form>
-      </div>
-    </div>
-  {% endfor %}
-{% else %}
-  <div class="alert alert-info">Everything for {{ repo }} is already reviewed.</div>
-{% endif %}
+    <h6 class="mt-4">Student Code</h6>
+    {% for f in fb.code_files %}
+      <p class="fw-bold small mb-1">{{ f.filename }}</p>
+      <pre><code>{{ f.code }}</code></pre>
+    {% endfor %}
+
+    <form method="post" action="{{ url_for('mark_reviewed', fid=fb.id) }}">
+      <textarea class="form-control mb-3" name="teacher_comments"
+                rows="3" placeholder="Your comments…"></textarea>
+      <button class="btn btn-success">Mark reviewed</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
 {% endblock %}
