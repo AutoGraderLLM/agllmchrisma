@@ -1,51 +1,39 @@
 {% extends 'base.html' %}
-
-{% block title %}Unreviewed Feedback{% endblock %}
+{% block title %}Review – {{ repo }}{% endblock %}
 
 {% block content %}
-  <h1 class="mb-4">Unreviewed Feedback</h1>
+<a href="{{ url_for('choose_student') }}" class="btn btn-link mb-3">← Back to students</a>
+<h2 class="mb-4">{{ repo }}</h2>
 
-  {% if feedbacks %}
-    {% for fb in feedbacks %}
-      <div class="card mb-3 shadow-sm">
-        <div class="card-header bg-white">
-          <strong>Feedback #{{ fb['id'] }}</strong>
-          <span class="text-muted">Submission {{ fb['submission_id'] }}</span>
-        </div>
-        <div class="card-body">
-          <p><strong>LLM Says:</strong> {{ fb['feedback_text'] }}</p>
-          <p class="text-muted small">Generated at {{ fb['generated_at'] }}</p>
-
-          <h6 class="mt-3">Student Code</h6>
-          <pre class="p-3 bg-white border rounded">{{ fb['code'] }}</pre>
-
-          <form
-            method="post"
-            action="{{ url_for('review_feedback', feedback_id=fb['id']) }}"
-            class="mt-3"
-          >
-            <div class="mb-3">
-              <label
-                for="teacher_comments_{{ fb['id'] }}"
-                class="form-label"
-              >Teacher Comments / Correction:</label>
-              <textarea
-                class="form-control"
-                id="teacher_comments_{{ fb['id'] }}"
-                name="teacher_comments"
-                rows="3"
-              ></textarea>
-            </div>
-            <button type="submit" class="btn btn-success">
-              Submit Correction
-            </button>
-          </form>
-        </div>
+{% if feedbacks %}
+  {% for fb in feedbacks %}
+    <div class="card mb-4 shadow-sm">
+      <div class="card-header">
+        <strong>#{{ fb.id }}</strong>
+        <span class="text-muted small ms-2">{{ fb.generated_at }}</span>
       </div>
-    {% endfor %}
-  {% else %}
-    <div class="alert alert-info">
-      No unreviewed feedback items at the moment.
+      <div class="card-body">
+        <h6>LLM Feedback</h6>
+        <div class="markdown-body">{{ fb.feedback_html|safe }}</div>
+
+        <h6 class="mt-4">Student Code</h6>
+        {% for c in fb.code_files %}
+          <p class="fw-bold small mb-1">{{ c.filename }}</p>
+          <pre class="p-3 bg-white border rounded"><code>{{ c.code }}</code></pre>
+        {% endfor %}
+
+        <form method="post" action="{{ url_for('mark_reviewed', fid=fb.id) }}">
+          <input type="hidden" name="repo" value="{{ repo }}">
+          <div class="mb-3">
+            <label for="t{{ fb.id }}" class="form-label">Teacher comments</label>
+            <textarea class="form-control" id="t{{ fb.id }}" name="teacher_comments" rows="3"></textarea>
+          </div>
+          <button type="submit" class="btn btn-success">Mark reviewed</button>
+        </form>
+      </div>
     </div>
-  {% endif %}
+  {% endfor %}
+{% else %}
+  <div class="alert alert-info">Everything for {{ repo }} is already reviewed.</div>
+{% endif %}
 {% endblock %}
