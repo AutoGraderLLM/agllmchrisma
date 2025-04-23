@@ -2,3 +2,5 @@ Flask==2.2.2
 torch
 transformers
 werkzeug==2.2.3
+markdown==3.5
+pygments==2.19.1
