@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Repos Awaiting Review{% endblock %}
+
 {% block content %}
 <h1 class="mb-4">Repos Awaiting Review</h1>
 
@@ -9,7 +10,10 @@
       <a class="list-group-item d-flex justify-content-between align-items-center"
          href="{{ url_for('student_detail', repo=s['repo_name']) }}">
         {{ s['repo_name'] }}
-        <span class="badge bg-primary rounded-pill">{{ s['cnt'] }}</span>
+        <span class="badge rounded-pill
+                     {{ 'bg-success' if s['red_flag']==0 else 'bg-danger' }}">
+          {{ s['cnt'] }}
+        </span>
       </a>
     {% endfor %}
   </ul>

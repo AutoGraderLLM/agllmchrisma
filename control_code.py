@@ -1,40 +1,43 @@
 #!/usr/bin/env python3
 """
-control_code.py
-───────────────
+control_code.py  v1.4
+────────────────────────────────────────────────────────────
 • Collects student repo name from CLI
-• Reads all *.py files, autograder output, README
-• Sends a prompt to the Ollama “ux1” model
+• Reads *all* source files under ~/logs/studentcode  (language-agnostic)
+• Detects perfect autograder scores
+• Retrieves last 3 teacher-reviewed comments for the repo
+• Sends a retrieval-augmented prompt to Ollama (“ux1” model)
 • Writes markdown feedback to ~/logs/feedback.md
-• Inserts rows into the **new schema**:
+• Persists rows into:
 
     submissions      (legacy `code` column kept)
     code_files       (one row per file)
     autograder_outputs
     feedback         (repo_name + reviewed flag)
 
-Assumes agllmdatabase.db is at $HOME/agllmdatabase.db (override with $AGLLM_DB).
+SQLite path defaults to $HOME/agllmdatabase.db (overridable with $AGLLM_DB).
 """
 
-import os, sys, sqlite3, subprocess, shutil
+import os, sys, sqlite3, subprocess, shutil, re
 from pathlib import Path
 from datetime import datetime
 
 # ─────────────────────────── config ─────────────────────────────
-DB_PATH = os.getenv("AGLLM_DB",
-                    os.path.join(os.getenv("HOME"), "agllmdatabase.db"))
-LOGS_DIR = Path(os.getenv("HOME") or ".").joinpath("logs")
-STUDENT_CODE_DIR = LOGS_DIR / "studentcode"
-AUTO_FILE = LOGS_DIR / "autograder_output.txt"
-README_FILE = LOGS_DIR / "README.md"
-FEEDBACK_MD = LOGS_DIR / "feedback.md"
-ASSIGNMENT_ID = 101
-TEST_ID       = 1001                     # kept for future use
-OLLAMA_MODEL  = "ux1"
+DB_PATH         = os.getenv("AGLLM_DB",
+                             os.path.join(os.getenv("HOME"), "agllmdatabase.db"))
+LOGS_DIR        = Path(os.getenv("HOME") or ".").joinpath("logs")
+STUDENT_CODE_DIR= LOGS_DIR / "studentcode"
+AUTO_FILE       = LOGS_DIR / "autograder_output.txt"
+README_FILE     = LOGS_DIR / "README.md"
+FEEDBACK_MD     = LOGS_DIR / "feedback.md"
+ASSIGNMENT_ID   = 101
+TEST_ID         = 1001          # reserved for future use
+OLLAMA_MODEL    = "ux1"
 
 # ─────────────────────────── helpers ────────────────────────────
 def err(msg: str):
-    print(f"❌ {msg}", file=sys.stderr); sys.exit(1)
+    print(f"❌ {msg}", file=sys.stderr)
+    sys.exit(1)
 
 def read_file(path: Path) -> str:
     for enc in ("utf-8", "ISO-8859-1"):
@@ -57,20 +60,26 @@ def run_ollama(prompt: str) -> str:
         err(f"Ollama error ⇒ {res.stderr.strip()}")
     return res.stdout
 
+def is_perfect_score(text: str) -> bool:
+    """True if autograder gave full marks."""
+    if "All tests passed" in text:
+        return True
+    m = re.search(r"Points\s+(\d+)\s*/\s*(\d+)", text, re.I)
+    return bool(m and m.group(1) == m.group(2))
+
 # ─────────────────────────── main flow ──────────────────────────
 def main() -> None:
-    # 0️⃣ student repo
+    # 0️⃣ repo name
     if len(sys.argv) < 2:
         err("Usage: control_code.py <repo_name>")
     repo_name = sys.argv[1]
 
-    # 1️⃣ gather code files
+    # 1️⃣ gather every file in studentcode/
     if not STUDENT_CODE_DIR.is_dir():
         err(f"{STUDENT_CODE_DIR} not found")
-    # NEW (language-agnostic)
     code_files = sorted(
         p for p in STUDENT_CODE_DIR.rglob("*")
-        if p.is_file() and not p.name.startswith(".")     # skip dot-files
+        if p.is_file() and not p.name.startswith(".")
     )
     if not code_files:
         err(f"No files found in {STUDENT_CODE_DIR}")
@@ -80,31 +89,68 @@ def main() -> None:
         student_code_blob += f"File: {p.relative_to(STUDENT_CODE_DIR)}\n"
         student_code_blob += read_file(p) + "\n\n"
 
-    autograder_out = read_file(AUTO_FILE)    if AUTO_FILE.exists() else ""
-    professor_inst = read_file(README_FILE)  if README_FILE.exists() else ""
+    autograder_out   = read_file(AUTO_FILE)   if AUTO_FILE.exists() else ""
+    professor_instr  = read_file(README_FILE) if README_FILE.exists() else ""
 
-    # 2️⃣ query model
-    prompt = (
-        "DO NOT CORRECT THE CODE! Provide question-based guided feedback only.\n\n"
-        f"**Student Code**\n{student_code_blob}\n"
-        f"**Autograder Output**\n{autograder_out}\n"
-        f"**Professor Instructions**\n{professor_inst}\n"
-    )
-    feedback_text = run_ollama(prompt)
+    perfect          = is_perfect_score(autograder_out)
 
-    # 3️⃣ save markdown
-    FEEDBACK_MD.write_text(
-        f"# Feedback for {repo_name}\n\n{feedback_text}",
-        encoding="utf-8"
-    )
-    print(f"📄  Feedback saved → {FEEDBACK_MD}")
-
-    # 4️⃣ insert into SQLite
-    ts = datetime.utcnow().isoformat() + "Z"
+    # 2️⃣  DB connection (for history + later inserts)
+    ts   = datetime.utcnow().isoformat() + "Z"
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
+
+    # pull last 3 reviewed teacher comments
+    past_fb = cur.execute(
+        """
+        SELECT teacher_comments
+          FROM feedback
+         WHERE repo_name = ? AND reviewed = 1
+     ORDER BY reviewed_at DESC
+         LIMIT 3
+        """,
+        (repo_name,),
+    ).fetchall()
+    prior_feedback = "\n\n".join(row[0] for row in past_fb if row[0]) or "None so far."
+
+    # 3️⃣  build prompt
+    if perfect:
+        system_note = (
+            "The autograder awarded a perfect score. Congratulate the student "
+            "briefly. THEN examine Professor Instructions: ask guiding questions "
+            "only if the code violates a requirement (e.g. banned libraries, "
+            "time complexity). Otherwise add no further guidance."
+        )
+    else:
+        system_note = (
+            "Provide question-based guided feedback; do not supply final answers."
+        )
+
+    prompt = f"""{system_note}
+
+**Student Code**
+{student_code_blob}
+
+**Autograder Output**
+{autograder_out}
+
+**Professor Instructions**
+{professor_instr}
+
+**Recent Teacher Feedback (for context)**
+{prior_feedback}
+"""
+
+    # 4️⃣ call LLM
+    feedback_text = run_ollama(prompt)
+
+    # 5️⃣ write markdown (for GitHub commit)
+    FEEDBACK_MD.write_text(f"# Feedback for {repo_name}\n\n{feedback_text}",
+                           encoding="utf-8")
+    print(f"📄  Feedback saved → {FEEDBACK_MD}")
+
+    # 6️⃣  insert DB rows
     try:
-        # submissions row (legacy `code` keeps full blob for quick view)
+        # submissions row (legacy full blob)
         cur.execute(
             """INSERT INTO submissions
                  (student_repo, assignment_id, code, submitted_at)
@@ -113,7 +159,7 @@ def main() -> None:
         )
         submission_id = cur.lastrowid
 
-        # code_files rows
+        # code_files
         for p in code_files:
             cur.execute(
                 "INSERT INTO code_files(submission_id, filename, code) VALUES (?,?,?)",
@@ -122,11 +168,12 @@ def main() -> None:
 
         # autograder output
         cur.execute(
-            "INSERT INTO autograder_outputs(submission_id, output, generated_at) VALUES (?,?,?)",
+            "INSERT INTO autograder_outputs(submission_id, output, generated_at) "
+            "VALUES (?,?,?)",
             (submission_id, autograder_out, ts)
         )
 
-        # feedback row (reviewed = 0)
+        # feedback (reviewed = 0)
         cur.execute(
             """INSERT INTO feedback
                    (submission_id, repo_name, feedback_text, generated_at)
