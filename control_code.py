@@ -124,9 +124,10 @@ def main() -> None:
         system_note = (
             "Provide question-based guided feedback; do not supply final answers."
         )
-
+    
     prompt = f"""{system_note}
-
+   
+    
 **Student Code**
 {student_code_blob}
 
@@ -139,7 +140,7 @@ def main() -> None:
 **Recent Teacher Feedback (for context)**
 {prior_feedback}
 """
-
+     print(prompt)
     # 4️⃣ call LLM
     feedback_text = run_ollama(prompt)
 
