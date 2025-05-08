@@ -1,17 +1,45 @@
-/* ─────────────────────────── GLOBAL ─────────────────────────── */
-body            { background:#f8f9fa; font-family:system-ui,sans-serif; }
+/* ───────── GLOBAL ───────── */
+body { background:#f8f9fa; font-family: system-ui, sans-serif; }
 
-/* ─────────────────────────── CARDS ──────────────────────────── */
-.card           { border:none; border-radius:.5rem; box-shadow:0 2px 8px #0001; }
-.card-header    { background:#fff; border-bottom:1px solid #dee2e6; font-weight:600; }
+/* ───────── CARDS ────────── */
+.card        { border:none; border-radius:.5rem; box-shadow:0 2px 8px #0001; }
+.card-header { background:#fff; border-bottom:1px solid #dee2e6; font-weight:600; }
 
-/* ───────────────── markdown ─────────────────────────────────── */
-.markdown-body code { background:#f1f3f5; padding:.15rem .35rem; border-radius:.25rem; }
+/* ───────── markdown inline code ───────── */
+.markdown-body code {
+  background:#f1f3f5;
+  padding:.15rem .35rem;
+  border-radius:.25rem;
+}
 
-/* ───────────────── CODE BLOCKS ───────────────────────────────── */
-pre, pre code   { background:#272b30; color:#f1f1f1; font-size:.85rem; overflow-x:auto;
-                  border-radius:.35rem; padding:1rem; line-height:1.4; }
+/* ───────── CODE BLOCKS with line numbers ───────── */
+pre.codeblock {
+  background:#272b30;
+  color:#f1f1f1;
+  font-size:.85rem;
+  line-height:1.35;
+  overflow-x:auto;
+  border-radius:.35rem;
+  padding:1rem;
+  counter-reset: lineno;
+  font-family: Menlo, Consolas, 'Courier New', monospace;
+}
 
-/* ───────────────── MISC ─────────────────────────────────────── */
-.list-group-item{ cursor:pointer; }
-textarea        { min-height:6rem; }
+pre.codeblock code { white-space:pre; }
+
+pre.codeblock code span {
+  display:inline-block;
+  counter-increment: lineno;
+}
+
+pre.codeblock code span::before {
+  content: counter(lineno);
+  display:inline-block;
+  width:3em;
+  margin-right:.75em;
+  color:#888;
+}
+
+/* ───────── MISC ───────── */
+.list-group-item { cursor:pointer; }
+textarea         { min-height:6rem; }
