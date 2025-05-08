@@ -8,55 +8,64 @@ on:
 jobs:
   build:
     runs-on: self-hosted
+
     steps:
-      # 1) Checkout repo
-      - uses: actions/checkout@v2
+    # 1) Checkout the STUDENT repo (the one that triggered the workflow)
+    - uses: actions/checkout@v3
 
-      # 1.5) Ensure logs dir + blank autograder_output.txt
-      - name: Prepare logs directory
-        run: |
-          mkdir -p $HOME/logs
-          : > $HOME/logs/autograder_output.txt
+    # 1.5) Checkout the CONTROL repository that contains control_code.py
+    - name: Checkout control-code repo
+      uses: actions/checkout@v3
+      with:
+        repository: AutoGraderLLM/agllmchrisma   # <— control repo
+        ref: main
+        path: control_repo                       # checked out to sub‑dir
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2) Autograde
-      - uses: education/autograding@v1
-        id: autograde
-        continue-on-error: true
+    # 2) Prepare logs directory
+    - name: Prepare logs
+      run: |
+        mkdir -p $HOME/logs
+        : > $HOME/logs/autograder_output.txt
 
-      # 3) Copy repo into logs (for control_code prompt)
-      - name: Copy repo to logs
-        run: |
-          find $HOME/logs/ -mindepth 1 ! -name 'autograder_output.txt' -delete
-          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
-          cp -r "/actions-runner/_work/$REPO_NAME/$REPO_NAME"/* "$HOME/logs/"
+    # 3) Run autograder
+    - uses: education/autograding@v1
+      id: autograde
+      continue-on-error: true
 
-      # 3.5) ***Sync latest control_code.py into $HOME***
-      - name: Update control_code.py for runner
-        run: |
-          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
-          cp "/actions-runner/_work/$REPO_NAME/$REPO_NAME/control_code.py" "$HOME/"
+    # 4) Copy student repo into logs for control_code prompt
+    - name: Copy repo to logs
+      run: |
+        find $HOME/logs/ -mindepth 1 ! -name 'autograder_output.txt' -delete
+        REPO_NAME=$(basename "$GITHUB_REPOSITORY")
+        cp -r "/actions-runner/_work/$REPO_NAME/$REPO_NAME"/* "$HOME/logs/"
 
-      # 4) Execute control_code.py
-      - name: Run feedback generator
-        if: always()
-        run: |
-          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
-          python3 "$HOME/control_code.py" "$REPO_NAME"
+    # 4.5) Sync latest control_code.py from control repo
+    - name: Update control_code.py
+      run: |
+        cp control_repo/control_code.py $HOME/
 
-      # 5) Git config
-      - name: Configure git identity
-        run: |
-          git config --global user.name  "GitHub Actions"
-          git config --global user.email "actions@github.com"
+    # 5) Execute control_code.py
+    - name: Generate LLM feedback
+      if: always()
+      run: |
+        REPO_NAME=$(basename "$GITHUB_REPOSITORY")
+        python3 "$HOME/control_code.py" "$REPO_NAME"
 
-      # 6) Commit & push feedback.md
-      - name: Commit feedback.md
-        if: always()
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp "$HOME/logs/feedback.md" .
-          git add feedback.md
-          git commit -m "Add feedback file" || true
-          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}"
+    # 6) Configure Git identity
+    - name: Configure git
+      run: |
+        git config --global user.name  "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    # 7) Commit & push feedback.md
+    - name: Commit feedback
+      if: always()
+      continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cp "$HOME/logs/feedback.md" .
+        git add feedback.md
+        git commit -m "Add feedback file" || true
+        git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}"
