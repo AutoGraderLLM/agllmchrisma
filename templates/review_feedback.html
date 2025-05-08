@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Review – {{ repo }}{% endblock %}
+
 {% block content %}
 <a href="{{ url_for('choose_student') }}" class="btn btn-link mb-3">← Back</a>
 <h2 class="mb-4">{{ repo }}</h2>
@@ -10,22 +11,27 @@
     <strong>#{{ fb.id }}</strong>
     <span class="text-muted small ms-2">{{ fb.generated_at }}</span>
   </div>
+
   <div class="card-body">
 
+    <!-- LLM feedback ------------------------------------------------------->
     <h6>LLM Feedback</h6>
     <div class="markdown-body">{{ fb.feedback_html|safe }}</div>
 
+    <!-- student code ------------------------------------------------------->
     <h6 class="mt-4">Student Code</h6>
     {% for f in fb.code_files %}
       <p class="fw-bold small mb-1">{{ f.filename }}</p>
-      <pre><code>{{ f.code }}</code></pre>
+      <pre class="codeblock"><code>{{ f.code|e }}</code></pre>
     {% endfor %}
 
+    <!-- teacher comment form --------------------------------------------->
     <form method="post" action="{{ url_for('mark_reviewed', fid=fb.id) }}">
       <textarea class="form-control mb-3" name="teacher_comments"
                 rows="3" placeholder="Your comments…"></textarea>
       <button class="btn btn-success">Mark reviewed</button>
     </form>
+
   </div>
 </div>
 {% endfor %}
