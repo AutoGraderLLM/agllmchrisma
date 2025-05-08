@@ -2,61 +2,61 @@ name: Autograding
 
 on:
   push:
-    branches:
-      - '*'                # Trigger on push to any branch
-    paths-ignore:
-      - 'feedback.md'      # Ignore changes to feedback.md
+    branches: ['*']
+    paths-ignore: ['feedback.md']
 
 jobs:
   build:
-    name: Autograding
     runs-on: self-hosted
-
     steps:
-      # Step 1: Checkout the repository
+      # 1) Checkout repo
       - uses: actions/checkout@v2
 
-      # Step 1.5: Create autograder_output.txt file and logs directory
-      - name: Create autograder_output.txt and logs directory
+      # 1.5) Ensure logs dir + blank autograder_output.txt
+      - name: Prepare logs directory
         run: |
-          mkdir -p $HOME/logs/
-          touch $HOME/logs/autograder_output.txt
+          mkdir -p $HOME/logs
+          : > $HOME/logs/autograder_output.txt
 
-      # Step 2: Run autograding
+      # 2) Autograde
       - uses: education/autograding@v1
         id: autograde
         continue-on-error: true
 
-      # Step 3: Clone the working directory to logs
-      - name: Clone Working Directory
+      # 3) Copy repo into logs (for control_code prompt)
+      - name: Copy repo to logs
         run: |
           find $HOME/logs/ -mindepth 1 ! -name 'autograder_output.txt' -delete
-          REPO_NAME=$(echo "$GITHUB_REPOSITORY" | awk -F'/' '{print $2}')
-          cp -r /actions-runner/_work/$REPO_NAME/$REPO_NAME/* $HOME/logs/
+          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
+          cp -r "/actions-runner/_work/$REPO_NAME/$REPO_NAME"/* "$HOME/logs/"
 
-      # Step 4: Run Python script
-      - name: Run Python script
+      # 3.5) ***Sync latest control_code.py into $HOME***
+      - name: Update control_code.py for runner
         run: |
-          REPO_NAME=$(echo "$GITHUB_REPOSITORY" | awk -F'/' '{print $2}')
-          pwd
-          ls
-          python3 $HOME/control_code.py $REPO_NAME
-        if: always()  # always run, even on failure
+          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
+          cp "/actions-runner/_work/$REPO_NAME/$REPO_NAME/control_code.py" "$HOME/"
 
-      # Step 5: Configure Git
-      - name: Configure Git
+      # 4) Execute control_code.py
+      - name: Run feedback generator
+        if: always()
         run: |
-          git config --global user.name "GitHub Actions"
+          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
+          python3 "$HOME/control_code.py" "$REPO_NAME"
+
+      # 5) Git config
+      - name: Configure git identity
+        run: |
+          git config --global user.name  "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      # Step 6: Stage, commit, and push Feedback.md file
-      - name: Stage, commit, and push Feedback.md
+      # 6) Commit & push feedback.md
+      - name: Commit feedback.md
+        if: always()
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp $HOME/logs/feedback.md .
+          cp "$HOME/logs/feedback.md" .
           git add feedback.md
-          git commit -m "Add Feedback file"
-          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
-        if: always()
+          git commit -m "Add feedback file" || true
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}"
