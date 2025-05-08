@@ -17,9 +17,9 @@ jobs:
     - name: Checkout control-code repo
       uses: actions/checkout@v3
       with:
-        repository: AutoGraderLLM/agllmchrisma   # <— control repo
+        repository: AutoGraderLLM/agllmchrisma          # control repo
         ref: main
-        path: control_repo                       # checked out to sub‑dir
+        path: control_repo
         token: ${{ secrets.GITHUB_TOKEN }}
 
     # 2) Prepare logs directory
@@ -32,7 +32,19 @@ jobs:
     - uses: education/autograding@v1
       id: autograde
       continue-on-error: true
+      
+   # 3.1) Append summary line for control_code.py
+    - name: Append points summary to autograder_output.txt
+      env:
+        SCORE: ${{ steps.autograde.outputs.Points }}   # ← "15/15"
+      run: |
+        echo "Points ${SCORE}" >> $HOME/logs/autograder_output.txt
+        # optional: add 'All tests passed' for exact match detection
+        if [ "$(echo "$SCORE" | cut -d'/' -f1)" = "$(echo "$SCORE" | cut -d'/' -f2)" ]; then
+            echo "All tests passed" >> $HOME/logs/autograder_output.txt
+        fi
 
+        
     # 4) Copy student repo into logs for control_code prompt
     - name: Copy repo to logs
       run: |
