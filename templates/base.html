@@ -20,6 +20,12 @@
   {% block content %}{% endblock %}
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.querySelectorAll('pre.codeblock > code').forEach(block => {
+  const lines = block.textContent.split(/\r?\n/);
+  block.innerHTML = lines.map(l =>
+    `<span>${l.replace(/ /g,'&nbsp;')}</span>`).join('\n');
+});
+</script>
 </body>
 </html>
