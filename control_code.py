@@ -140,7 +140,6 @@ def main() -> None:
 **Recent Teacher Feedback (for context)**
 {prior_feedback}
 """
-    print(prompt)
     # 4️⃣ call LLM
     feedback_text = run_ollama(prompt)
 
